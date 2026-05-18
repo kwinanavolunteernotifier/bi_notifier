@@ -48,6 +48,3 @@ jobs:
           # Only commit if files actually changed
           git diff --staged --quiet || git commit -m "Update state and dashboard snapshot [skip ci]"
           git push
-
-      - name: Keepalive Workflow
-        uses: gautamkrishnar/keepalive-workflow@v2
