@@ -42,14 +42,8 @@ jobs:
 
       - name: Commit updated state
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "kwinanavolunteernotifier"
+          git config user.email "kwinana.volunteer.notifier@gmail.com"
           git add state.json docs/
-          # Only commit if files actually changed
-          git diff --staged --quiet || git commit -m "Update state and dashboard snapshot [skip ci]"
-          git push
-
-      - name: Keepalive
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow enable "${{ github.workflow }}" -R "${{ github.repository }}"
+          git diff --staged --quiet || git commit -m "Update state [skip ci]"
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
