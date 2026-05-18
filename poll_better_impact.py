@@ -51,11 +51,14 @@ SUPERVISOR_FIELD_NAME = "Supervisor Interview Outcome"
 # Registration Form signature (Signed Document) — set to None to disable monitoring
 REGISTRATION_FIELD_NAME = "Registration Form - Sign"
 
+# Event Volunteer Registration Form signature (Signed Document)
+EVENT_REGISTRATION_FIELD_NAME = "Event Volunteer Registration Form"
+
 # Fields that trigger an immediate email when changed from empty
-IMMEDIATE_FIELDS = {REGISTRATION_FIELD_NAME, HR_FIELD_NAME, SITE_FIELD_NAME, SUPERVISOR_FIELD_NAME}
+IMMEDIATE_FIELDS = {REGISTRATION_FIELD_NAME, EVENT_REGISTRATION_FIELD_NAME, HR_FIELD_NAME, SITE_FIELD_NAME, SUPERVISOR_FIELD_NAME}
 
 # Fields that indicate a form submission (shown separately in the email)
-FORM_SUBMISSION_FIELDS = {REGISTRATION_FIELD_NAME}
+FORM_SUBMISSION_FIELDS = {REGISTRATION_FIELD_NAME, EVENT_REGISTRATION_FIELD_NAME}
 
 # Better Impact API base URL
 API_BASE = "https://api.betterimpact.com/v1"
@@ -123,11 +126,14 @@ def update_dashboard_json(state, now, api_ok, email_ok):
         name = info.get("name", "Unknown")
         fields = info.get("fields", {})
         reg = fields.get(REGISTRATION_FIELD_NAME, {}).get("value")
+        event_reg = fields.get(EVENT_REGISTRATION_FIELD_NAME, {}).get("value")
+        # Treat either registration form as starting the pipeline
+        has_reg = reg or event_reg
         outcome = fields.get(SUPERVISOR_FIELD_NAME, {}).get("value")
         hr = fields.get(HR_FIELD_NAME, {}).get("value")
         site = fields.get(SITE_FIELD_NAME, {}).get("value")
         
-        if reg and not outcome:
+        if has_reg and not outcome:
             new_apps.append(name)
         if outcome == "Passed" and not hr:
             awaiting_hr.append(name)
@@ -387,6 +393,7 @@ def check_stalled_workflows(users_state, now):
         fields = info.get("fields", {})
         
         reg_form = fields.get(REGISTRATION_FIELD_NAME, {})
+        event_reg_form = fields.get(EVENT_REGISTRATION_FIELD_NAME, {})
         outcome = fields.get(SUPERVISOR_FIELD_NAME, {})
         hr_ind = fields.get(HR_FIELD_NAME, {})
 
@@ -402,6 +409,20 @@ def check_stalled_workflows(users_state, now):
                     })
             except (ValueError, TypeError):
                 pass
+                
+        # 1b. Application Stalled (Event Vol)
+        if event_reg_form.get("value") and not outcome.get("value"):
+            try:
+                update_time = datetime.fromisoformat(event_reg_form.get("updated_at"))
+                if (now - update_time).days >= 5:
+                    stalled.append({
+                        "name": name,
+                        "type": "Event Application Stalled",
+                        "reason": f"Event Registration form submitted {(now - update_time).days} days ago, but no Interview Outcome."
+                    })
+            except (ValueError, TypeError):
+                pass
+
                 
         # 2. Accepted but Induction Incomplete
         if outcome.get("value") == "Passed" and not hr_ind.get("value"):
@@ -424,7 +445,7 @@ def main():
     now = datetime.now(TZ)
     print(f"Poll started at {now.strftime('%d/%m/%Y %H:%M')}")
 
-    fields_to_monitor = [f for f in [HR_FIELD_NAME, SITE_FIELD_NAME, SUPERVISOR_FIELD_NAME, REGISTRATION_FIELD_NAME] if f]
+    fields_to_monitor = [f for f in [HR_FIELD_NAME, SITE_FIELD_NAME, SUPERVISOR_FIELD_NAME, REGISTRATION_FIELD_NAME, EVENT_REGISTRATION_FIELD_NAME] if f]
 
     state = load_state()
     if "dashboard_activity" not in state:
