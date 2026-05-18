@@ -48,3 +48,8 @@ jobs:
           # Only commit if files actually changed
           git diff --staged --quiet || git commit -m "Update state and dashboard snapshot [skip ci]"
           git push
+
+      - name: Keepalive
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow enable "${{ github.workflow }}" -R "${{ github.repository }}"
